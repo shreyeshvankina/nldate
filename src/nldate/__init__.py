@@ -71,8 +71,8 @@ def parse(s: str, today: date | None = None) -> date:
 
             return today + timedelta(days=days_ahead)
 
-    # 3. Relative complex dates (now supports words "one" through "twenty")
-    rel_pattern = rf"(?:in\s+)?((?:(?:{NUM_REGEX})\s+[a-z]+\s*(?:and\s+)?)+)\s*(ago|before|after|from)?\s*(.*)?"
+    # 3. Relative complex dates (now supports commas like "2 years, 3 months")
+    rel_pattern = rf"(?:in\s+)?((?:(?:{NUM_REGEX})\s+[a-z]+\s*(?:and\s+|,\s*)?)+)\s*(ago|before|after|from)?\s*(.*)?"
     rel_match = re.search(rel_pattern, s)
 
     if rel_match and rel_match.group(1):

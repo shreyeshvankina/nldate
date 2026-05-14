@@ -18,7 +18,7 @@ def parse(s: str, today: date | None = None) -> date:
     if s == "yesterday":
         return today - timedelta(days=1)
 
-    # 2. Next / Last Weekdays
+    # 2. Next / Last Weekdays (e.g., "next tuesday")
     weekdays = {
         "monday": 0,
         "tuesday": 1,
@@ -43,8 +43,9 @@ def parse(s: str, today: date | None = None) -> date:
 
             return today + timedelta(days=days_ahead)
 
-    # 3. Relative complex dates (now supports "a" or "an" instead of digits)
-    rel_pattern = r"(?:in\s+)?((?:(?:\d+|an?)\s+[a-z]+\s*(?:and\s+)?)+)\s*(ago|before|after|from)?\s*(.*)?"
+    # 3. Relative complex dates (e.g., "5 days before December 1st, 2025" or "in 3 days")
+    # This regex looks for quantities and units, followed by a direction and a base date string.
+    rel_pattern = r"(?:in\s+)?((?:\d+\s+[a-z]+\s*(?:and\s+)?)+)\s*(ago|before|after|from)?\s*(.*)?"
     rel_match = re.search(rel_pattern, s)
 
     if rel_match and rel_match.group(1):
@@ -62,31 +63,20 @@ def parse(s: str, today: date | None = None) -> date:
                 # Fallback to dateutil parser for explicit dates
                 base_date = dt_parser.parse(base_str).date()
 
-        # Parse the delta
-        years = months = weeks = days = 0
-        units = re.findall(r"(\d+|an?)\s+(year|month|week|day)s?", quantities_str)
-
+        # Parse the delta (e.g., "1 year and 2 months" -> years=1, months=2)
+        kwargs = {"years": 0, "months": 0, "weeks": 0, "days": 0}
+        units = re.findall(r"(\d+)\s+(year|month|week|day)s?", quantities_str)
         for amount, unit in units:
-            # Handle "a" or "an" as 1
-            val = 1 if amount in ["a", "an"] else int(amount)
+            kwargs[f"{unit}s"] += int(amount)
 
-            if unit == "year":
-                years += val
-            elif unit == "month":
-                months += val
-            elif unit == "week":
-                weeks += val
-            elif unit == "day":
-                days += val
-
-        delta = relativedelta(years=years, months=months, weeks=weeks, days=days)
+        delta = relativedelta(**kwargs)  # type: ignore
 
         if direction in ["ago", "before"]:
             return base_date - delta
         else:
             return base_date + delta
 
-    # 4. Fallback
+    # 4. Fallback: Try parsing as a standard absolute date
     try:
         return dt_parser.parse(s).date()
     except (dt_parser.ParserError, ValueError):

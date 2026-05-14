@@ -3,6 +3,34 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from dateutil import parser as dt_parser
 
+# Map word numbers to integers
+WORD_TO_NUM = {
+    "a": 1,
+    "an": 1,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+}
+# Dynamically build the regex string for the numbers (e.g., "\d+|a|an|one|two...")
+NUM_REGEX = r"\d+|" + r"|".join(WORD_TO_NUM.keys())
+
 
 def parse(s: str, today: date | None = None) -> date:
     if today is None:
@@ -18,7 +46,7 @@ def parse(s: str, today: date | None = None) -> date:
     if s == "yesterday":
         return today - timedelta(days=1)
 
-    # 2. Next / Last Weekdays (e.g., "next tuesday")
+    # 2. Next / Last Weekdays
     weekdays = {
         "monday": 0,
         "tuesday": 1,
@@ -43,9 +71,8 @@ def parse(s: str, today: date | None = None) -> date:
 
             return today + timedelta(days=days_ahead)
 
-    # 3. Relative complex dates (e.g., "5 days before December 1st, 2025" or "in 3 days")
-    # This regex looks for quantities and units, followed by a direction and a base date string.
-    rel_pattern = r"(?:in\s+)?((?:\d+\s+[a-z]+\s*(?:and\s+)?)+)\s*(ago|before|after|from)?\s*(.*)?"
+    # 3. Relative complex dates (now supports words "one" through "twenty")
+    rel_pattern = rf"(?:in\s+)?((?:(?:{NUM_REGEX})\s+[a-z]+\s*(?:and\s+)?)+)\s*(ago|before|after|from)?\s*(.*)?"
     rel_match = re.search(rel_pattern, s)
 
     if rel_match and rel_match.group(1):
@@ -63,20 +90,31 @@ def parse(s: str, today: date | None = None) -> date:
                 # Fallback to dateutil parser for explicit dates
                 base_date = dt_parser.parse(base_str).date()
 
-        # Parse the delta (e.g., "1 year and 2 months" -> years=1, months=2)
-        kwargs = {"years": 0, "months": 0, "weeks": 0, "days": 0}
-        units = re.findall(r"(\d+)\s+(year|month|week|day)s?", quantities_str)
-        for amount, unit in units:
-            kwargs[f"{unit}s"] += int(amount)
+        # Parse the delta
+        years = months = weeks = days = 0
+        units = re.findall(rf"({NUM_REGEX})\s+(year|month|week|day)s?", quantities_str)
 
-        delta = relativedelta(**kwargs)  # type: ignore
+        for amount, unit in units:
+            # Convert string to integer using our dictionary or int()
+            val = int(amount) if amount.isdigit() else WORD_TO_NUM[amount]
+
+            if unit == "year":
+                years += val
+            elif unit == "month":
+                months += val
+            elif unit == "week":
+                weeks += val
+            elif unit == "day":
+                days += val
+
+        delta = relativedelta(years=years, months=months, weeks=weeks, days=days)
 
         if direction in ["ago", "before"]:
             return base_date - delta
         else:
             return base_date + delta
 
-    # 4. Fallback: Try parsing as a standard absolute date
+    # 4. Fallback
     try:
         return dt_parser.parse(s).date()
     except (dt_parser.ParserError, ValueError):

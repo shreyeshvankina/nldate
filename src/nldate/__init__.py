@@ -3,10 +3,11 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from dateutil import parser as dt_parser
 
-# Map word numbers to integers
+# Map word numbers to integers (added "the" to handle "the day after...")
 WORD_TO_NUM = {
     "a": 1,
     "an": 1,
+    "the": 1,
     "one": 1,
     "two": 2,
     "three": 3,
@@ -28,7 +29,7 @@ WORD_TO_NUM = {
     "nineteen": 19,
     "twenty": 20,
 }
-# Dynamically build the regex string for the numbers (e.g., "\d+|a|an|one|two...")
+# Dynamically build the regex string for the numbers (e.g., "\d+|a|an|the|one|two...")
 NUM_REGEX = r"\d+|" + r"|".join(WORD_TO_NUM.keys())
 
 
@@ -71,7 +72,7 @@ def parse(s: str, today: date | None = None) -> date:
 
             return today + timedelta(days=days_ahead)
 
-    # 3. Relative complex dates (now supports commas like "2 years, 3 months")
+    # 3. Relative complex dates
     rel_pattern = rf"(?:in\s+)?((?:(?:{NUM_REGEX})\s+[a-z]+\s*(?:and\s+|,\s*)?)+)\s*(ago|before|after|from)?\s*(.*)?"
     rel_match = re.search(rel_pattern, s)
 
